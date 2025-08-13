@@ -99,4 +99,4 @@ def delete_user(id):
     db.session.delete(user)
     db.session.commit()
     db.session.close()
-    return 'User Successfully Deleted!', 204
+    return {'message': f'User {id} deleted successfully.'}, 200
