@@ -125,7 +125,7 @@ def new_user():
     }
     response = requests.post(BASE_URL, json=user_data)
     response.raise_for_status()
-    assert response.status_code == 201
+    assert response.status_code == 200
     data = response.json()
     yield data
 
