@@ -22,14 +22,6 @@ class PaginatedAPIMixin(object):
                 'per_page': per_page,
                 'total_pages': resources.pages,
                 'total_items': resources.total
-            },
-            '_links': {
-                'self': url_for(endpoint, page=page, per_page=per_page,
-                                **kwargs),
-                'next': url_for(endpoint, page=page + 1, per_page=per_page,
-                                **kwargs) if resources.has_next else None,
-                'prev': url_for(endpoint, page=page - 1, per_page=per_page,
-                                **kwargs) if resources.has_prev else None
             }
         }
         return data
@@ -45,14 +37,13 @@ followers = sa.Table(
 
 class User(PaginatedAPIMixin, UserMixin, db.Model):
     id: so.Mapped[int] = so.mapped_column(primary_key=True)
-    username: so.Mapped[str] = so.mapped_column(sa.String(64), index=True,
-                                                unique=True)
-    email: so.Mapped[str] = so.mapped_column(sa.String(120), index=True,
-                                             unique=True)
+    username: so.Mapped[str] = so.mapped_column(sa.String(64), index=True, unique=True)
+    email: so.Mapped[str] = so.mapped_column(sa.String(120), index=True, unique=True)
     password_hash: so.Mapped[Optional[str]] = so.mapped_column(sa.String(256))
     about_me: so.Mapped[Optional[str]] = so.mapped_column(sa.String(140))
-    last_seen: so.Mapped[Optional[datetime]] = so.mapped_column(
-        default=lambda: datetime.now(timezone.utc))
+    last_seen: so.Mapped[Optional[datetime]] = so.mapped_column(default=lambda: datetime.now(timezone.utc))
+    created_date: so.Mapped[datetime] = so.mapped_column(default=lambda: datetime.now(timezone.utc))
+    modify_date: so.Mapped[datetime] = so.mapped_column(default=lambda: datetime.now(timezone.utc))
 
     posts: so.WriteOnlyMapped['Post'] = so.relationship(
         back_populates='author', passive_deletes=True)
@@ -110,33 +101,24 @@ class User(PaginatedAPIMixin, UserMixin, db.Model):
             self.posts.select().subquery())
         return db.session.scalar(query)
 
-    def to_dict(self, include_email=False):
+    def to_dict(self):
         data = {
             'id': self.id,
             'username': self.username,
-            'last_seen': self.last_seen.replace(
-                tzinfo=timezone.utc).isoformat() if self.last_seen else None,
             'about_me': self.about_me,
-            'post_count': self.posts_count(),
-            'follower_count': self.followers_count(),
-            'following_count': self.following_count(),
-            '_links': {
-                'self': url_for('api.get_user', id=self.id),
-                'followers': url_for('api.get_followers', id=self.id),
-                'following': url_for('api.get_following', id=self.id),
-                'avatar': self.avatar(128)
-            }
+            'email': self.email
         }
-        if include_email:
-            data['email'] = self.email
         return data
     
     def from_dict(self, data, new_user=False):
         for field in ['username', 'email', 'about_me']:
             if field in data:
                 setattr(self, field, data[field])
+                self.modify_date = datetime.now(timezone.utc)
         if new_user and 'password' in data:
             self.set_password(data['password'])
+            self.created_date = datetime.now(timezone.utc)
+            self.modify_date = datetime.now(timezone.utc)
 
     def get_token(self, expires_in=3600):
         now = datetime.now(timezone.utc)

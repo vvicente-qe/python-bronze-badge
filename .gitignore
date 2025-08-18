@@ -4,3 +4,4 @@
 .pytest_cache/
 text.text
 tests/__pycache__/
+.env

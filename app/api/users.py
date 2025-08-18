@@ -12,7 +12,6 @@ def json_response(data, status=200, headers=None):
     response.status_code = status
     if headers:
         response.headers.extend(headers)
-    # test_response = json.dumps(response.get_json(), indent=4)
     return response
 
 
@@ -35,8 +34,9 @@ def get_users():
 @bp.route('/users', methods=['POST'])
 def create_user():
     data = request.get_json()
-    if 'username' not in data or 'email' not in data or 'password' not in data:
-        return bad_request('must include username, email and password fields')
+    # required field validation
+    if not data or not data.get('username') or not data.get('email') or not data.get('password'):
+        return bad_request('please provide a username, email and password')
     if db.session.scalar(sa.select(User).where(
             User.username == data['username'])):
         return bad_request('please use a different username')
