@@ -102,13 +102,12 @@ class User(PaginatedAPIMixin, UserMixin, db.Model):
         return db.session.scalar(query)
 
     def to_dict(self):
-        data = {
+        return {
             'id': self.id,
             'username': self.username,
             'about_me': self.about_me,
             'email': self.email
         }
-        return data
     
     def from_dict(self, data, new_user=False):
         for field in ['username', 'email', 'about_me']:
@@ -117,8 +116,9 @@ class User(PaginatedAPIMixin, UserMixin, db.Model):
                 self.modify_date = datetime.now(timezone.utc)
         if new_user and 'password' in data:
             self.set_password(data['password'])
-            self.created_date = datetime.now(timezone.utc)
-            self.modify_date = datetime.now(timezone.utc)
+            dateNow = datetime.now(timezone.utc)
+            self.created_date = dateNow
+            self.modify_date = dateNow
 
     def get_token(self, expires_in=3600):
         now = datetime.now(timezone.utc)
