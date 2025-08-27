@@ -1,9 +1,8 @@
 import sqlalchemy as sa
-from flask import request, url_for, abort, jsonify
+from flask import request, url_for, jsonify
 from app import db
 from app.models import User
 from app.api import bp
-from app.api.auth import token_auth
 from app.api.errors import bad_request
 import json
 
@@ -16,14 +15,12 @@ def json_response(data, status=200, headers=None):
 
 
 @bp.route('/users/<int:id>', methods=['GET'])
-# @token_auth.login_required
 def get_user(id):
     result = db.get_or_404(User, id).to_dict()
     db.session.close()
     return json_response(result, 200)
 
 @bp.route('/users', methods=['GET'])
-# @token_auth.login_required
 def get_users():
     page = request.args.get('page', 1, type=int)
     per_page = min(request.args.get('per_page', 10, type=int), 100)
@@ -52,10 +49,7 @@ def create_user():
     return json_response(user.to_dict(), 201, headers)
 
 @bp.route('/users/<int:id>', methods=['PUT'])
-# @token_auth.login_required
 def update_user(id):
-    # if token_auth.current_user().id != id:
-    #     abort(403)
     user = db.get_or_404(User, id)
     data = request.get_json()
     if 'username' in data and data['username'] != user.username and \
@@ -73,7 +67,6 @@ def update_user(id):
     return json_response(result, 200)
 
 @bp.route('/users/<int:id>', methods=['DELETE'])
-# @token_auth.login_required
 def delete_user(id):
     user = db.get_or_404(User, id)
     db.session.delete(user)

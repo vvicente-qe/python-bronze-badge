@@ -5,3 +5,5 @@
 text.text
 tests/__pycache__/
 .env
+app.db
+app.db-journal
