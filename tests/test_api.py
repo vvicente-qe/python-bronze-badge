@@ -10,47 +10,20 @@ DB_PATH = '/c:/Users/VenmarVicente/Desktop/python-bronze-badge/app.db'
 CRU_USER_SCHEMA = {
     "type": "object",
     "properties": {
-        "_links": {
-            "type": "object",
-            "properties": {
-                "avatar": {"type": "string", "format": "uri"},
-                "followers": {"type": "string"},
-                "following": {"type": "string"},
-                "self": {"type": "string"}
-            },
-            "required": ["avatar", "followers", "following", "self"]
-        },
-        "about_me": {"type": ["string", "null"]},
-        "follower_count": {"type": "integer"},
-        "following_count": {"type": "integer"},
         "id": {"type": "integer"},
-        "last_seen": {"type": "string", "format": "date-time"},
-        "post_count": {"type": "integer"},
-        "username": {"type": "string"}
+        "username": {"type": "string"},
+        "email": {"type": "string", "format": "email"},
+        "about_me": {"type": ["string", "null"]}
     },
     "required": [
-        "_links",
-        "follower_count",
-        "following_count",
         "id",
-        "last_seen",
-        "post_count",
-        "username"
+        "username",
+        "email"
     ]
 }
-
 READ_USER_LIST_SCHEMA = {
     "type": "object",
     "properties": {
-        "_links": {
-            "type": "object",
-            "properties": {
-                "next": {"type": ["string", "null"]},
-                "prev": {"type": ["string", "null"]},
-                "self": {"type": "string"}
-            },
-            "required": ["next", "prev", "self"]
-        },
         "_meta": {
             "type": "object",
             "properties": {
@@ -66,37 +39,16 @@ READ_USER_LIST_SCHEMA = {
             "items": {
                 "type": "object",
                 "properties": {
-                    "_links": {
-                        "type": "object",
-                        "properties": {
-                            "avatar": {"type": "string", "format": "uri"},
-                            "followers": {"type": "string"},
-                            "following": {"type": "string"},
-                            "self": {"type": "string"}
-                        },
-                        "required": ["avatar", "followers", "following", "self"]
-                    },
-                    "about_me": {"type": ["string", "null"]},
-                    "follower_count": {"type": "integer"},
-                    "following_count": {"type": "integer"},
                     "id": {"type": "integer"},
-                    "last_seen": {"type": "string", "format": "date-time"},
-                    "post_count": {"type": "integer"},
-                    "username": {"type": "string"}
+                    "username": {"type": "string"},
+                    "email": {"type": "string", "format": "email"},
+                    "about_me": {"type": ["string", "null"]}
                 },
-                "required": [
-                    "_links",
-                    "follower_count",
-                    "following_count",
-                    "id",
-                    "last_seen",
-                    "post_count",
-                    "username"
-                ]
+                "required": ["id", "username", "email"]
             }
         }
     },
-    "required": ["_links", "_meta", "items"]
+    "required": ["_meta", "items"]
 }
 
 def get_user_from_db(user_id):
@@ -114,7 +66,9 @@ def get_user_from_db(user_id):
         }
     return None
 
-@pytest.fixture
+user_cache = {}
+
+@pytest.fixture(scope="module")
 def new_user():
     random_string = str(datetime.datetime.now().timestamp())
     user_data = {
@@ -125,59 +79,69 @@ def new_user():
     }
     response = requests.post(BASE_URL, json=user_data)
     response.raise_for_status()
-    assert response.status_code == 200
+    assert response.status_code == 201
     data = response.json()
+    user_cache["user"] = data
     yield data
 
-def test_get_user_api():
-    response = requests.get(f'{BASE_URL}/1')
-    data = response.json()
-    assert response.status_code == 200
-    validate(instance=data, schema=CRU_USER_SCHEMA)
-    assert data['username'] == 'test'
-    assert data['id'] == 1
-
-def test_get_user_list_api():
-    response = requests.get(BASE_URL)
-    data = response.json()
-    assert response.status_code == 200
-    assert data['_meta']['total_items'] > 1
-    validate(instance=data, schema=READ_USER_LIST_SCHEMA)
-
 def test_create_user_api(new_user):
-    assert new_user['username'].startswith('uname_')
-    assert new_user['about_me'].startswith('about me')
     validate(instance=new_user, schema=CRU_USER_SCHEMA)
 
     # Check in DB
     db_user = get_user_from_db(new_user['id'])
     assert db_user is not None
+    assert db_user['id'] == new_user['id']
     assert db_user['username'] == new_user['username']
+    assert db_user['email'] == new_user['email']
+    assert db_user['about_me'] == new_user['about_me']
 
-def test_edit_user_api(new_user):
+def test_get_user_api():
+    user = user_cache["user"]
+    user_id = user['id']
+    response = requests.get(f'{BASE_URL}/{user_id}')
+    data = response.json()
+    db_user = get_user_from_db(user_id)
+    validate(instance=data, schema=CRU_USER_SCHEMA)
+
+    assert response.status_code == 200
+    assert data['id'] == user['id'] == db_user['id']
+    assert data['username'] == user['username'] == db_user['username']
+    assert data['email'] == user['email'] == db_user['email']
+    assert data['about_me'] == user['about_me'] == db_user['about_me']
+
+
+def test_get_user_list_api():
+    response = requests.get(BASE_URL)
+    data = response.json()
+    validate(instance=data, schema=READ_USER_LIST_SCHEMA)
+    assert response.status_code == 200
+    assert data['_meta']['total_items'] > 0
+
+
+def test_edit_user_api():
+    user = user_cache["user"]
+    user_id = user['id']
+
     random_string = str(datetime.datetime.now().timestamp())
-    user_id = new_user['id']
     updated_data = {
         "username": f"updated_username{random_string}",
         "email": f"updated_email{random_string}@test.com",
         "about_me": f"updated about me{random_string}"
     }
+
     response = requests.put(f"{BASE_URL}/{user_id}", json=updated_data)
     data = response.json()
-    assert response.status_code == 200
-    validate(instance=new_user, schema=CRU_USER_SCHEMA)
-    assert data['username'] == f"updated_username{random_string}"
-    assert data['about_me'] == f"updated about me{random_string}"
-
-    # Check in DB
     db_user = get_user_from_db(user_id)
-    assert db_user is not None
-    assert db_user['username'] == updated_data['username']
-    assert db_user['email'] == updated_data['email']
-    assert db_user['about_me'] == updated_data['about_me']
+    validate(instance=data, schema=CRU_USER_SCHEMA)
 
-def test_delete_user_api(new_user):
-    user_id = new_user['id']
+    assert response.status_code == 200
+    assert data['username'] == f"updated_username{random_string}" == db_user['username']
+    assert data['email'] == f"updated_email{random_string}@test.com" == db_user['email']
+    assert data['about_me'] == f"updated about me{random_string}" == db_user['about_me']
+
+def test_delete_user_api():
+    user = user_cache["user"]
+    user_id = user['id']
     response = requests.delete(f'{BASE_URL}/{user_id}')
     assert response.status_code == 200
     assert response.json()['message'] == f'User {user_id} deleted successfully.'
